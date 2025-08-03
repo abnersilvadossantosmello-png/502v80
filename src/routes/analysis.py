@@ -10,7 +10,7 @@ import logging
 import time
 import json
 from datetime import datetime
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, send_file
 from services.enhanced_analysis_pipeline import enhanced_analysis_pipeline
 from services.quality_assurance_manager import quality_assurance_manager
 from services.ai_manager import ai_manager
@@ -19,6 +19,8 @@ from services.attachment_service import attachment_service
 from database import db_manager
 from routes.progress import get_progress_tracker, update_analysis_progress
 from services.auto_save_manager import auto_save_manager, salvar_etapa, salvar_erro
+from services.consolidated_report_generator import consolidated_report_generator
+from services.gemini_2_5_client import gemini_25_client
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,7 @@ def analyze_market():
         # Executa análise aprimorada com pipeline
         logger.info("🚀 Executando análise aprimorada...")
         try:
+            # Usa o pipeline aprimorado com Gemini 2.5 Pro
             analysis_result = enhanced_analysis_pipeline.execute_complete_analysis(
                 data,
                 session_id=session_id,
@@ -105,6 +108,17 @@ def analyze_market():
             
             # Salva resultado da análise imediatamente
             salvar_etapa("analise_resultado", analysis_result, categoria="analise_completa")
+            
+            # Gera relatórios consolidados
+            if progress_callback:
+                progress_callback(11, "📊 Gerando relatórios consolidados...")
+            
+            consolidated_reports = consolidated_report_generator.generate_consolidated_reports(
+                analysis_result, session_id
+            )
+            
+            # Adiciona informações dos relatórios ao resultado
+            analysis_result['relatorios_consolidados'] = consolidated_reports
             
             # Validação de qualidade ultra-rigorosa
             logger.info("🔍 Executando garantia de qualidade...")
@@ -132,6 +146,9 @@ def analyze_market():
             
             # Remove dados brutos do relatório final
             clean_analysis = quality_assurance_manager.filter_raw_data_comprehensive(analysis_result)
+            
+            # Adiciona informações dos relatórios consolidados
+            clean_analysis['relatorios_consolidados'] = analysis_result.get('relatorios_consolidados', {})
             
             # Salva análise limpa
             salvar_etapa("analise_limpa", clean_analysis, categoria="analise_completa")
@@ -611,16 +628,29 @@ def test_ai():
         data = request.get_json()
         prompt = data.get('prompt', 'Gere um breve resumo sobre o mercado digital brasileiro em 2024.')
         
-        logger.info("🧪 Testando sistema de IA...")
+        logger.info("🧪 Testando Gemini 2.5 Pro...")
         
-        # Testa IA
-        response = ai_manager.generate_analysis(prompt, max_tokens=500)
+        # Testa Gemini 2.5 Pro primeiro
+        if gemini_25_client.is_available():
+            try:
+                response = gemini_25_client.generate_ultra_analysis(prompt, max_tokens=500)
+                provider_used = 'gemini-2.5-pro'
+            except Exception as e:
+                logger.warning(f"⚠️ Gemini 2.5 Pro falhou: {e}")
+                # Fallback para sistema padrão
+                response = ai_manager.generate_analysis(prompt, max_tokens=500)
+                provider_used = 'fallback_system'
+        else:
+            response = ai_manager.generate_analysis(prompt, max_tokens=500)
+            provider_used = 'fallback_system'
         
         return jsonify({
             'success': bool(response),
             'prompt': prompt,
             'response': response,
             'response_length': len(response) if response else 0,
+            'provider_used': provider_used,
+            'gemini_25_available': gemini_25_client.is_available(),
             'provider_status': ai_manager.get_provider_status(),
             'timestamp': datetime.now().isoformat()
         })
@@ -744,3 +774,109 @@ def get_stats():
             'error': 'Erro ao obter estatísticas',
             'message': str(e)
         }), 500
+
+@analysis_bp.route('/download_consolidated_report/<report_type>/<session_id>', methods=['GET'])
+def download_consolidated_report(report_type, session_id):
+    """Download de relatório consolidado específico"""
+    
+    try:
+        from pathlib import Path
+        
+        reports_dir = Path("relatorios_consolidados")
+        
+        # Busca arquivo do relatório
+        pattern = f"analise_{session_id[:8]}*_{report_type}.*"
+        matching_files = list(reports_dir.glob(pattern))
+        
+        if not matching_files:
+            return jsonify({
+                'error': 'Relatório não encontrado',
+                'report_type': report_type,
+                'session_id': session_id
+            }), 404
+        
+        # Pega o arquivo mais recente
+        latest_file = max(matching_files, key=lambda f: f.stat().st_mtime)
+        
+        return send_file(
+            latest_file,
+            as_attachment=True,
+            download_name=latest_file.name
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao baixar relatório: {e}")
+        return jsonify({
+            'error': 'Erro ao baixar relatório',
+            'message': str(e)
+        }), 500
+
+@analysis_bp.route('/list_consolidated_reports/<session_id>', methods=['GET'])
+def list_consolidated_reports(session_id):
+    """Lista relatórios consolidados de uma sessão"""
+    
+    try:
+        from pathlib import Path
+        
+        reports_dir = Path("relatorios_consolidados")
+        
+        if not reports_dir.exists():
+            return jsonify({
+                'reports': [],
+                'total': 0,
+                'session_id': session_id
+            })
+        
+        # Busca relatórios da sessão
+        pattern = f"analise_{session_id[:8]}*"
+        matching_files = list(reports_dir.glob(pattern))
+        
+        reports = []
+        for file_path in matching_files:
+            reports.append({
+                'name': file_path.name,
+                'type': _extract_report_type(file_path.name),
+                'size': file_path.stat().st_size,
+                'created': datetime.fromtimestamp(file_path.stat().st_ctime).isoformat(),
+                'download_url': f"/api/download_consolidated_report/{_extract_report_type(file_path.name)}/{session_id}"
+            })
+        
+        # Ordena por data de criação
+        reports.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({
+            'reports': reports,
+            'total': len(reports),
+            'session_id': session_id,
+            'reports_directory': str(reports_dir)
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao listar relatórios: {e}")
+        return jsonify({
+            'error': 'Erro ao listar relatórios',
+            'message': str(e)
+        }), 500
+
+def _extract_report_type(filename: str) -> str:
+    """Extrai tipo de relatório do nome do arquivo"""
+    if 'executivo' in filename:
+        return 'executive'
+    elif 'tecnico' in filename:
+        return 'technical'
+    elif 'implementacao' in filename:
+        return 'implementation'
+    elif 'dashboard' in filename:
+        return 'dashboard'
+    elif 'insights' in filename:
+        return 'insights'
+    elif 'roi' in filename:
+        return 'roi'
+    elif 'contingencia' in filename:
+        return 'contingency'
+    elif 'monitoramento' in filename:
+        return 'monitoring'
+    elif 'indice' in filename:
+        return 'index'
+    else:
+        return 'unknown'

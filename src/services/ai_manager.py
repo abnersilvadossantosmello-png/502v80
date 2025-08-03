@@ -44,7 +44,7 @@ class AIManager:
                 'available': False,
                 'priority': 1,
                 'error_count': 0,
-                'model': 'gemini-1.5-flash',
+                'model': 'gemini-2.0-flash-exp',
                 'max_errors': 2,
                 'last_success': None,
                 'consecutive_failures': 0
@@ -54,7 +54,7 @@ class AIManager:
                 'available': False,
                 'priority': 2,
                 'error_count': 0,
-                'model': 'llama3-70b-8192',
+                'model': 'llama-3.3-70b-versatile',
                 'max_errors': 2,
                 'last_success': None,
                 'consecutive_failures': 0
@@ -95,9 +95,9 @@ class AIManager:
                 gemini_key = os.getenv('GEMINI_API_KEY')
                 if gemini_key:
                     genai.configure(api_key=gemini_key)
-                    self.providers['gemini']['client'] = genai.GenerativeModel("gemini-1.5-flash")
+                    self.providers['gemini']['client'] = genai.GenerativeModel("gemini-2.0-flash-exp")
                     self.providers['gemini']['available'] = True
-                    logger.info("✅ Gemini (gemini-1.5-flash) inicializado com sucesso")
+                    logger.info("✅ Gemini (gemini-2.0-flash-exp) inicializado com sucesso")
             except Exception as e:
                 logger.warning(f"⚠️ Falha ao inicializar Gemini: {str(e)}")
         else:
@@ -121,7 +121,7 @@ class AIManager:
             if HAS_GROQ_CLIENT and groq_client and groq_client.is_enabled():
                 self.providers['groq']['client'] = groq_client
                 self.providers['groq']['available'] = True
-                logger.info("✅ Groq (llama3-70b-8192) inicializado com sucesso")
+                logger.info("✅ Groq (llama-3.3-70b-versatile) inicializado com sucesso")
             else:
                 logger.warning("⚠️ Groq client não está habilitado")
         except Exception as e:
@@ -298,7 +298,12 @@ class AIManager:
     def _generate_with_gemini(self, prompt: str, max_tokens: int) -> Optional[str]:
         """Gera conteúdo usando Gemini."""
         client = self.providers['gemini']['client']
-        config = {"temperature": 0.7, "max_output_tokens": min(max_tokens, 8192)}
+        config = {
+            "temperature": 0.9, 
+            "max_output_tokens": min(max_tokens, 8192),
+            "top_p": 0.95,
+            "top_k": 64
+        }
         safety = [
             {"category": c, "threshold": "BLOCK_NONE"} 
             for c in ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]

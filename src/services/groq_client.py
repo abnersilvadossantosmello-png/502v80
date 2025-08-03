@@ -30,7 +30,7 @@ class GroqClient:
             try:
                 self.client = Groq(api_key=self.api_key)
                 self.available = True
-                logger.info("✅ Cliente Groq (llama3-70b-8192) inicializado com sucesso.")
+                logger.info("✅ Cliente Groq (llama-3.3-70b-versatile) inicializado com sucesso.")
             except Exception as e:
                 logger.error(f"❌ Falha ao inicializar o cliente Groq: {e}", exc_info=True)
         elif not HAS_GROQ:
@@ -58,7 +58,7 @@ class GroqClient:
 
         try:
             start_time = time.time()
-            # Usando o modelo Llama3 70b, conhecido por sua performance e velocidade na Groq
+            # Usando o modelo Llama 3.3 70b mais atualizado
             chat_completion = self.client.chat.completions.create(
                 messages=[
                     {
@@ -66,9 +66,9 @@ class GroqClient:
                         "content": prompt,
                     }
                 ],
-                model="llama3-70b-8192",
+                model="llama-3.3-70b-versatile",
                 max_tokens=max_tokens,
-                temperature=0.4, # Temperatura um pouco mais baixa para consistência
+                temperature=0.7, # Temperatura balanceada para criatividade e consistência
             )
             response_text = chat_completion.choices[0].message.content
             processing_time = time.time() - start_time

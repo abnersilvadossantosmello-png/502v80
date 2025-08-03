@@ -1,199 +1,959 @@
 // ARQV30 Enhanced v2.0 - Analysis JavaScript
+// Sistema aprimorado de análise com Gemini 2.5 Pro e relatórios consolidados
 
 class AnalysisManager {
     constructor() {
         this.currentAnalysis = null;
-        this.sessionId = this.generateSessionId();
-        this.progressInterval = null;
+        this.consolidatedReports = [];
+        this.progressTracker = null;
+        
         this.init();
     }
 
     init() {
-        this.setupFormSubmission();
-        this.setupKeyboardShortcuts();
-        this.checkSystemStatus();
+        this.setupAnalysisHandlers();
+        this.setupReportHandlers();
+        this.checkSystemCapabilities();
     }
 
-    generateSessionId() {
-        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    }
-
-    setupFormSubmission() {
-        const form = document.getElementById('analysisForm');
-        if (!form) return;
-
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.startAnalysis();
-        });
-    }
-
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Ctrl+Enter para analisar
-            if (e.ctrlKey && e.key === 'Enter') {
+    setupAnalysisHandlers() {
+        // Handler para análise aprimorada
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        if (analyzeBtn) {
+            analyzeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.startAnalysis();
+                this.executeEnhancedAnalysis();
+            });
+        }
+    }
+
+    setupReportHandlers() {
+        // Handlers para relatórios consolidados
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('download-report-btn')) {
+                const reportType = e.target.dataset.reportType;
+                const sessionId = e.target.dataset.sessionId;
+                this.downloadConsolidatedReport(reportType, sessionId);
             }
             
-            // Ctrl+S para salvar
-            if (e.ctrlKey && e.key === 's') {
-                e.preventDefault();
-                if (this.currentAnalysis) {
-                    this.saveAnalysisLocally(this.currentAnalysis);
-                }
+            if (e.target.classList.contains('view-report-btn')) {
+                const reportType = e.target.dataset.reportType;
+                const sessionId = e.target.dataset.sessionId;
+                this.viewConsolidatedReport(reportType, sessionId);
             }
         });
     }
 
-    async checkSystemStatus() {
+    async executeEnhancedAnalysis() {
         try {
-            const response = await fetch('/api/app_status');
-            const status = await response.json();
+            // Valida formulário
+            if (!this.validateEnhancedForm()) {
+                this.showError('Por favor, corrija os erros no formulário.');
+                return;
+            }
+
+            // Coleta dados
+            const formData = this.collectEnhancedFormData();
             
-            this.updateStatusIndicator(status);
-            this.updateSystemStatusBar(status);
-            
-        } catch (error) {
-            console.error('Erro ao verificar status:', error);
-            this.updateStatusIndicator({ status: 'error' });
-        }
-    }
+            console.log('🚀 Iniciando análise ultra-avançada:', formData);
 
-    updateStatusIndicator(status) {
-        const indicator = document.getElementById('statusIndicator');
-        const statusText = document.getElementById('statusText');
-        
-        if (!indicator || !statusText) return;
+            // Mostra progresso aprimorado
+            this.showEnhancedProgress();
 
-        indicator.className = 'status-indicator';
-        
-        if (status.status === 'production' || status.status === 'development') {
-            indicator.classList.add('online');
-            statusText.textContent = 'Sistema Online';
-        } else {
-            indicator.classList.add('offline');
-            statusText.textContent = 'Sistema Offline';
-        }
-    }
-
-    updateSystemStatusBar(status) {
-        const apiStatus = document.getElementById('apiStatus');
-        const extractorStatus = document.getElementById('extractorStatus');
-        
-        if (apiStatus) {
-            const services = status.services || {};
-            const searchProviders = services.search_providers || {};
-            
-            apiStatus.innerHTML = `
-                <i class="fas fa-cog"></i>
-                <span>APIs: ${searchProviders.available || 0}/${searchProviders.total || 0}</span>
-            `;
-        }
-        
-        if (extractorStatus) {
-            extractorStatus.innerHTML = `
-                <i class="fas fa-download"></i>
-                <span>Extratores: Ativos</span>
-            `;
-        }
-    }
-
-    async startAnalysis() {
-        const formData = this.collectFormData();
-        
-        if (!this.validateFormData(formData)) {
-            return;
-        }
-
-        try {
-            // Adiciona session ID
-            formData.session_id = this.sessionId;
-            
-            // Adiciona arquivos enviados
-            const uploadedFiles = window.uploadManager ? window.uploadManager.getUploadedFiles() : [];
-            formData.uploaded_files = uploadedFiles;
-
-            this.showProgressSection();
-            this.startProgressTracking();
-
+            // Executa análise
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(formData)
             });
 
             const result = await response.json();
 
-            if (response.ok && result) {
+            if (response.ok) {
                 this.currentAnalysis = result;
-                this.hideProgressSection();
-                this.displayResults(result);
-                this.showSuccess('Análise concluída com sucesso!');
+                this.hideProgress();
+                await this.displayEnhancedResults(result);
+                this.showSuccess('Análise ultra-avançada concluída com sucesso!');
+                
+                // Carrega relatórios consolidados
+                await this.loadConsolidatedReports(formData.session_id);
+                
             } else {
-                this.hideProgressSection();
-                this.showError(result.error || 'Erro na análise');
-                console.error('Erro na análise:', result);
+                throw new Error(result.message || 'Erro na análise');
             }
 
         } catch (error) {
-            this.hideProgressSection();
-            this.showError('Erro de conexão: ' + error.message);
-            console.error('Erro na análise:', error);
+            console.error('❌ Erro na análise:', error);
+            this.hideProgress();
+            this.showError('Erro na análise: ' + error.message);
         }
     }
 
-    collectFormData() {
+    validateEnhancedForm() {
+        const form = document.getElementById('analysisForm');
+        const requiredFields = form.querySelectorAll('[required]');
+        
+        let isValid = true;
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                this.highlightFieldError(field, 'Campo obrigatório');
+                isValid = false;
+            } else {
+                this.clearFieldError(field);
+            }
+        });
+
+        // Validação específica do segmento
+        const segmento = document.getElementById('segmento');
+        if (segmento && segmento.value.trim().length < 3) {
+            this.highlightFieldError(segmento, 'Segmento deve ter pelo menos 3 caracteres');
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    collectEnhancedFormData() {
         const form = document.getElementById('analysisForm');
         const formData = new FormData(form);
-        const data = {};
-
+        
+        const data = {
+            session_id: this.generateSessionId(),
+            timestamp: new Date().toISOString(),
+            analysis_type: 'ultra_advanced',
+            ai_preference: 'gemini_2_5_pro'
+        };
+        
+        // Coleta dados do formulário
         for (let [key, value] of formData.entries()) {
-            data[key] = value;
+            if (value.trim()) {
+                if (['preco', 'objetivo_receita', 'orcamento_marketing'].includes(key)) {
+                    data[key] = parseFloat(value) || 0;
+                } else {
+                    data[key] = value.trim();
+                }
+            }
+        }
+
+        // Adiciona arquivos enviados se houver
+        if (window.uploadManager) {
+            data.uploaded_files = window.uploadManager.getUploadedFiles();
         }
 
         return data;
     }
 
-    validateFormData(data) {
-        if (!data.segmento || data.segmento.trim().length < 3) {
-            this.showError('Segmento de mercado é obrigatório (mínimo 3 caracteres)');
-            return false;
-        }
-
-        return true;
-    }
-
-    showProgressSection() {
+    showEnhancedProgress() {
         const progressArea = document.getElementById('progressArea');
+        const resultsArea = document.getElementById('resultsArea');
+        
         if (progressArea) {
             progressArea.style.display = 'block';
             progressArea.scrollIntoView({ behavior: 'smooth' });
+            
+            // Atualiza textos para análise aprimorada
+            const currentStep = document.getElementById('currentStep');
+            if (currentStep) {
+                currentStep.textContent = 'Iniciando análise ultra-avançada com Gemini 2.5 Pro...';
+            }
+        }
+        
+        if (resultsArea) {
+            resultsArea.style.display = 'none';
         }
 
-        // Desabilita botão de análise
+        // Atualiza botão
         const analyzeBtn = document.getElementById('analyzeBtn');
         if (analyzeBtn) {
             analyzeBtn.disabled = true;
             analyzeBtn.classList.add('loading');
-            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Analisando...</span>';
+            analyzeBtn.innerHTML = '<i class="fas fa-magic fa-spin"></i> <span>Analisando com IA Avançada...</span>';
+        }
+
+        // Inicia tracking de progresso aprimorado
+        this.startEnhancedProgressTracking();
+    }
+
+    async startEnhancedProgressTracking() {
+        try {
+            // Mensagens de progresso aprimoradas
+            const enhancedMessages = [
+                '🔍 Executando pesquisa inteligente massiva...',
+                '🧠 Sintetizando conteúdo com IA avançada...',
+                '🚀 Analisando com Gemini 2.5 Pro...',
+                '⚡ Gerando componentes ultra-robustos...',
+                '🧠 Criando drivers mentais customizados...',
+                '🎭 Desenvolvendo provas visuais inovadoras...',
+                '🛡️ Construindo sistema anti-objeção avançado...',
+                '🎯 Arquitetando pré-pitch revolucionário...',
+                '🔮 Gerando predições futuras avançadas...',
+                '📊 Consolidando relatórios premium...',
+                '💾 Salvando relatórios localmente...',
+                '📋 Gerando múltiplos formatos...',
+                '✅ Análise ultra-avançada concluída!'
+            ];
+
+            let currentStep = 0;
+            
+            this.progressInterval = setInterval(() => {
+                if (currentStep < enhancedMessages.length) {
+                    this.updateEnhancedProgressUI({
+                        current_step: currentStep + 1,
+                        total_steps: enhancedMessages.length,
+                        current_message: enhancedMessages[currentStep],
+                        percentage: ((currentStep + 1) / enhancedMessages.length) * 100
+                    });
+                    currentStep++;
+                } else {
+                    clearInterval(this.progressInterval);
+                }
+            }, 3000); // A cada 3 segundos
+
+        } catch (error) {
+            console.error('❌ Erro no tracking de progresso:', error);
         }
     }
 
-    hideProgressSection() {
+    updateEnhancedProgressUI(progress) {
+        // Atualiza barra de progresso
+        const progressFill = document.querySelector('.progress-fill');
+        if (progressFill) {
+            progressFill.style.width = progress.percentage + '%';
+        }
+
+        // Atualiza mensagem atual
+        const currentStep = document.getElementById('currentStep');
+        if (currentStep) {
+            currentStep.textContent = progress.current_message;
+        }
+
+        // Atualiza contador
+        const stepCounter = document.getElementById('stepCounter');
+        if (stepCounter) {
+            stepCounter.textContent = `${progress.current_step}/${progress.total_steps}`;
+        }
+
+        // Adiciona efeitos visuais
+        this.addProgressVisualEffects(progress);
+    }
+
+    addProgressVisualEffects(progress) {
+        // Adiciona efeitos visuais baseados no progresso
+        const progressContainer = document.querySelector('.progress-container');
+        if (progressContainer) {
+            // Remove classes anteriores
+            progressContainer.classList.remove('phase-research', 'phase-ai', 'phase-components', 'phase-consolidation');
+            
+            // Adiciona classe baseada na fase
+            if (progress.current_step <= 3) {
+                progressContainer.classList.add('phase-research');
+            } else if (progress.current_step <= 6) {
+                progressContainer.classList.add('phase-ai');
+            } else if (progress.current_step <= 10) {
+                progressContainer.classList.add('phase-components');
+            } else {
+                progressContainer.classList.add('phase-consolidation');
+            }
+        }
+    }
+
+    async displayEnhancedResults(analysis) {
+        console.log('📊 Exibindo resultados ultra-avançados:', analysis);
+        
+        const resultsArea = document.getElementById('resultsArea');
+        if (resultsArea) {
+            resultsArea.style.display = 'block';
+            resultsArea.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Exibe componentes aprimorados
+        await this.displayUltraRobustAvatar(analysis.avatar_ultra_detalhado);
+        await this.displayEnhancedInsights(analysis.insights_exclusivos);
+        await this.displayAdvancedMetrics(analysis.metricas_kpis_ultra_avancados);
+        await this.displayInnovativeComponents(analysis);
+        
+        // Exibe metadados aprimorados
+        this.displayEnhancedMetadata(analysis.metadata);
+        
+        // Configura downloads de relatórios
+        this.setupReportDownloads(analysis);
+    }
+
+    async displayUltraRobustAvatar(avatar) {
+        if (!avatar) return;
+
+        const container = document.getElementById('avatarResults');
+        if (!container) return;
+
+        const demografico = avatar.perfil_demografico || {};
+        const psicografico = avatar.perfil_psicografico || {};
+        const comportamental = avatar.analise_comportamental_avancada || {};
+        const dores = avatar.dores_viscerais || [];
+        const desejos = avatar.desejos_secretos || [];
+
+        container.innerHTML = `
+            <div class="result-section">
+                <div class="result-section-header">
+                    <h4><i class="fas fa-user-astronaut"></i> Avatar Ultra-Robusto (${Object.keys(demografico).length + Object.keys(psicografico).length} atributos)</h4>
+                    <div class="quality-indicator">
+                        <span class="quality-badge ultra-premium">ULTRA PREMIUM</span>
+                    </div>
+                </div>
+                <div class="result-section-content">
+                    <div class="avatar-grid">
+                        <div class="avatar-card enhanced">
+                            <h5><i class="fas fa-chart-bar"></i> Perfil Demográfico Detalhado</h5>
+                            ${Object.entries(demografico).map(([key, value]) => `
+                                <div class="avatar-item enhanced">
+                                    <span class="avatar-label">${this.formatLabel(key)}</span>
+                                    <span class="avatar-value">${value}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <div class="avatar-card enhanced">
+                            <h5><i class="fas fa-brain"></i> Perfil Psicográfico Avançado</h5>
+                            ${Object.entries(psicografico).map(([key, value]) => `
+                                <div class="avatar-item enhanced">
+                                    <span class="avatar-label">${this.formatLabel(key)}</span>
+                                    <span class="avatar-value">${value}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    ${comportamental.padroes_decisao ? `
+                        <div class="avatar-card enhanced">
+                            <h5><i class="fas fa-cogs"></i> Análise Comportamental Avançada</h5>
+                            <div class="behavioral-analysis">
+                                <div class="behavior-item">
+                                    <strong>Padrões de Decisão:</strong>
+                                    <ul>${comportamental.padroes_decisao.map(p => `<li>${p}</li>`).join('')}</ul>
+                                </div>
+                                <div class="behavior-item">
+                                    <strong>Triggers Emocionais:</strong>
+                                    <ul>${comportamental.triggers_emocionais?.map(t => `<li>${t}</li>`).join('') || '<li>Analisando...</li>'}</ul>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="avatar-grid">
+                        <div class="avatar-card enhanced">
+                            <h5><i class="fas fa-heart-broken"></i> Dores Viscerais (${dores.length})</h5>
+                            <ul class="insight-list enhanced">
+                                ${dores.map((dor, index) => `
+                                    <li class="insight-item enhanced">
+                                        <span class="insight-number">${index + 1}</span>
+                                        <span class="insight-text">${dor}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div class="avatar-card enhanced">
+                            <h5><i class="fas fa-star"></i> Desejos Secretos (${desejos.length})</h5>
+                            <ul class="insight-list enhanced">
+                                ${desejos.map((desejo, index) => `
+                                    <li class="insight-item enhanced">
+                                        <span class="insight-number">${index + 1}</span>
+                                        <span class="insight-text">${desejo}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async displayEnhancedInsights(insights) {
+        if (!insights || !Array.isArray(insights)) return;
+
+        const container = document.getElementById('insightsResults');
+        if (!container) return;
+
+        // Se insights são objetos aprimorados
+        const isEnhanced = insights.length > 0 && typeof insights[0] === 'object';
+
+        container.innerHTML = `
+            <div class="result-section">
+                <div class="result-section-header">
+                    <h4><i class="fas fa-lightbulb"></i> Insights Ultra-Robustos (${insights.length})</h4>
+                    <div class="quality-indicators">
+                        <span class="quality-badge premium">DADOS REAIS</span>
+                        <span class="quality-badge enhanced">ULTRA PREMIUM</span>
+                    </div>
+                </div>
+                <div class="result-section-content">
+                    <div class="insights-showcase enhanced">
+                        ${insights.map((insight, index) => {
+                            if (isEnhanced) {
+                                return `
+                                    <div class="insight-card enhanced" data-priority="${insight.prioridade || 5}">
+                                        <div class="insight-header">
+                                            <div class="insight-number">${insight.id || index + 1}</div>
+                                            <div class="insight-meta">
+                                                <span class="insight-category">${insight.categoria || 'Mercado'}</span>
+                                                <span class="insight-priority priority-${this.getPriorityClass(insight.prioridade || 5)}">${insight.prioridade || 5}/10</span>
+                                            </div>
+                                        </div>
+                                        <div class="insight-content">${insight.insight_original || insight.insight || insight}</div>
+                                        ${insight.acionabilidade ? `
+                                            <div class="insight-actionability">
+                                                <strong>Acionabilidade:</strong> ${insight.acionabilidade.score || 'N/A'}/10
+                                                <div class="implementation-steps">
+                                                    ${insight.acionabilidade.passos_implementacao?.map(passo => `<div class="step">${passo}</div>`).join('') || ''}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        ${insight.impacto_estimado ? `
+                                            <div class="insight-impact">
+                                                <strong>Impacto:</strong> <span class="impact-${insight.impacto_estimado.toLowerCase()}">${insight.impacto_estimado}</span>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            } else {
+                                return `
+                                    <div class="insight-card">
+                                        <div class="insight-number">${index + 1}</div>
+                                        <div class="insight-content">${insight}</div>
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Adiciona interatividade aos insights aprimorados
+        if (isEnhanced) {
+            this.addInsightInteractivity();
+        }
+    }
+
+    async displayAdvancedMetrics(metrics) {
+        if (!metrics) return;
+
+        const container = document.getElementById('metricsResults');
+        if (!container) return;
+
+        const projecoes = metrics.projecoes_financeiras || {};
+        const kpis = metrics.kpis_principais || [];
+
+        container.innerHTML = `
+            <div class="result-section">
+                <div class="result-section-header">
+                    <h4><i class="fas fa-chart-line"></i> Métricas e KPIs Ultra-Avançados</h4>
+                </div>
+                <div class="result-section-content">
+                    <div class="metrics-dashboard">
+                        <div class="financial-projections">
+                            <h5>💰 Projeções Financeiras Detalhadas</h5>
+                            <div class="projections-grid">
+                                ${this.renderFinancialScenario('Conservador', projecoes.cenario_conservador)}
+                                ${this.renderFinancialScenario('Realista', projecoes.cenario_realista)}
+                                ${this.renderFinancialScenario('Otimista', projecoes.cenario_otimista)}
+                            </div>
+                        </div>
+                        
+                        <div class="kpis-section">
+                            <h5>📊 KPIs Principais</h5>
+                            <div class="kpis-grid">
+                                ${kpis.map(kpi => `
+                                    <div class="kpi-card">
+                                        <div class="kpi-name">${kpi.metrica || 'Métrica'}</div>
+                                        <div class="kpi-target">${kpi.objetivo || 'N/A'}</div>
+                                        <div class="kpi-frequency">${kpi.frequencia || 'N/A'}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        ${metrics.framework_metricas_avancado ? `
+                            <div class="advanced-metrics">
+                                <h5>⚡ Framework de Métricas Avançado</h5>
+                                <div class="framework-grid">
+                                    <div class="framework-item">
+                                        <strong>Leading Indicators:</strong>
+                                        <ul>${metrics.framework_metricas_avancado.metricas_leading?.map(m => `<li>${m}</li>`).join('') || '<li>Carregando...</li>'}</ul>
+                                    </div>
+                                    <div class="framework-item">
+                                        <strong>Lagging Indicators:</strong>
+                                        <ul>${metrics.framework_metricas_avancado.metricas_lagging?.map(m => `<li>${m}</li>`).join('') || '<li>Carregando...</li>'}</ul>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async displayInnovativeComponents(analysis) {
+        // Exibe componentes inovadores se disponíveis
+        const innovativeComponents = [
+            'analise_ecossistema',
+            'ia_aplicada', 
+            'sustentabilidade_esg',
+            'experiencia_cliente_360',
+            'inovacao_disruptiva'
+        ];
+
+        for (const componentName of innovativeComponents) {
+            if (analysis[componentName]) {
+                await this.displayInnovativeComponent(componentName, analysis[componentName]);
+            }
+        }
+    }
+
+    async displayInnovativeComponent(componentName, componentData) {
+        const container = document.getElementById('innovativeResults') || this.createInnovativeContainer();
+        
+        const componentTitle = this.formatComponentTitle(componentName);
+        const componentIcon = this.getComponentIcon(componentName);
+
+        const componentHtml = `
+            <div class="result-section innovative">
+                <div class="result-section-header">
+                    <h4><i class="${componentIcon}"></i> ${componentTitle}</h4>
+                    <span class="innovation-badge">INOVADOR</span>
+                </div>
+                <div class="result-section-content">
+                    ${this.formatInnovativeComponentContent(componentData)}
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', componentHtml);
+    }
+
+    async loadConsolidatedReports(sessionId) {
+        try {
+            const response = await fetch(`/api/list_consolidated_reports/${sessionId}`);
+            const result = await response.json();
+
+            if (response.ok && result.reports) {
+                this.consolidatedReports = result.reports;
+                this.displayConsolidatedReportsSection(result.reports, sessionId);
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao carregar relatórios consolidados:', error);
+        }
+    }
+
+    displayConsolidatedReportsSection(reports, sessionId) {
+        const container = document.getElementById('reportsResults') || this.createReportsContainer();
+
+        const reportsHtml = `
+            <div class="result-section">
+                <div class="result-section-header">
+                    <h4><i class="fas fa-file-alt"></i> Relatórios Consolidados (${reports.length})</h4>
+                </div>
+                <div class="result-section-content">
+                    <div class="reports-grid">
+                        ${reports.map(report => `
+                            <div class="report-card">
+                                <div class="report-icon">
+                                    <i class="${this.getReportIcon(report.type)}"></i>
+                                </div>
+                                <div class="report-info">
+                                    <h6>${this.getReportTitle(report.type)}</h6>
+                                    <p>${this.getReportDescription(report.type)}</p>
+                                    <div class="report-meta">
+                                        <span class="report-size">${this.formatFileSize(report.size)}</span>
+                                        <span class="report-date">${new Date(report.created).toLocaleDateString('pt-BR')}</span>
+                                    </div>
+                                </div>
+                                <div class="report-actions">
+                                    <button class="btn-secondary download-report-btn" 
+                                            data-report-type="${report.type}" 
+                                            data-session-id="${sessionId}">
+                                        <i class="fas fa-download"></i> Download
+                                    </button>
+                                    ${report.type === 'dashboard' ? `
+                                        <button class="btn-secondary view-report-btn" 
+                                                data-report-type="${report.type}" 
+                                                data-session-id="${sessionId}">
+                                            <i class="fas fa-eye"></i> Visualizar
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = reportsHtml;
+    }
+
+    async downloadConsolidatedReport(reportType, sessionId) {
+        try {
+            this.showInfo(`Baixando relatório ${this.getReportTitle(reportType)}...`);
+
+            const response = await fetch(`/api/download_consolidated_report/${reportType}/${sessionId}`);
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${this.getReportTitle(reportType)}_${new Date().toISOString().slice(0, 10)}.${this.getReportExtension(reportType)}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                this.showSuccess(`Relatório ${this.getReportTitle(reportType)} baixado com sucesso!`);
+            } else {
+                throw new Error('Erro ao baixar relatório');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao baixar relatório:', error);
+            this.showError('Erro ao baixar relatório: ' + error.message);
+        }
+    }
+
+    async viewConsolidatedReport(reportType, sessionId) {
+        if (reportType === 'dashboard') {
+            // Abre dashboard em nova aba
+            const url = `/api/download_consolidated_report/${reportType}/${sessionId}`;
+            window.open(url, '_blank');
+        }
+    }
+
+    displayEnhancedMetadata(metadata) {
+        if (!metadata) return;
+
+        const container = document.getElementById('metadataResults');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="result-section">
+                <div class="result-section-header">
+                    <h4><i class="fas fa-info-circle"></i> Metadados da Análise Ultra-Avançada</h4>
+                </div>
+                <div class="result-section-content">
+                    <div class="metadata-grid enhanced">
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">IA Principal</span>
+                            <span class="metadata-value">${metadata.ai_provider_primary || 'N/A'}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">IA Fallback</span>
+                            <span class="metadata-value">${metadata.ai_provider_fallback || 'N/A'}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Tempo de Processamento</span>
+                            <span class="metadata-value">${metadata.processing_time_formatted || 'N/A'}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Score de Qualidade</span>
+                            <span class="metadata-value quality-score">${metadata.quality_score || 0}%</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Relatórios Gerados</span>
+                            <span class="metadata-value">${metadata.consolidated_reports || 0}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Dados Brutos Filtrados</span>
+                            <span class="metadata-value">${metadata.raw_data_filtered ? '✅ SIM' : '❌ NÃO'}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Backup Local</span>
+                            <span class="metadata-value">${metadata.local_backup?.success ? '✅ GARANTIDO' : '❌ FALHOU'}</span>
+                        </div>
+                        <div class="metadata-item premium">
+                            <span class="metadata-label">Pipeline</span>
+                            <span class="metadata-value">${metadata.pipeline_version || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Métodos auxiliares
+    generateSessionId() {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    formatLabel(key) {
+        return key.replace(/_/g, ' ')
+                 .replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    getPriorityClass(priority) {
+        if (priority >= 8) return 'high';
+        if (priority >= 6) return 'medium';
+        return 'low';
+    }
+
+    formatComponentTitle(componentName) {
+        const titles = {
+            'analise_ecossistema': 'Análise de Ecossistema',
+            'ia_aplicada': 'IA Aplicada',
+            'sustentabilidade_esg': 'Sustentabilidade e ESG',
+            'experiencia_cliente_360': 'Experiência do Cliente 360°',
+            'inovacao_disruptiva': 'Inovação Disruptiva'
+        };
+        return titles[componentName] || componentName;
+    }
+
+    getComponentIcon(componentName) {
+        const icons = {
+            'analise_ecossistema': 'fas fa-network-wired',
+            'ia_aplicada': 'fas fa-robot',
+            'sustentabilidade_esg': 'fas fa-leaf',
+            'experiencia_cliente_360': 'fas fa-user-friends',
+            'inovacao_disruptiva': 'fas fa-rocket'
+        };
+        return icons[componentName] || 'fas fa-cog';
+    }
+
+    getReportIcon(reportType) {
+        const icons = {
+            'executive': 'fas fa-crown',
+            'technical': 'fas fa-cogs',
+            'implementation': 'fas fa-tasks',
+            'dashboard': 'fas fa-chart-bar',
+            'insights': 'fas fa-lightbulb',
+            'roi': 'fas fa-dollar-sign',
+            'contingency': 'fas fa-shield-alt',
+            'monitoring': 'fas fa-eye'
+        };
+        return icons[reportType] || 'fas fa-file';
+    }
+
+    getReportTitle(reportType) {
+        const titles = {
+            'executive': 'Relatório Executivo Premium',
+            'technical': 'Análise Técnica Detalhada',
+            'implementation': 'Guia de Implementação',
+            'dashboard': 'Dashboard Interativo',
+            'insights': 'Relatório de Insights',
+            'roi': 'Análise de ROI',
+            'contingency': 'Plano de Contingência',
+            'monitoring': 'Sistema de Monitoramento'
+        };
+        return titles[reportType] || 'Relatório';
+    }
+
+    getReportDescription(reportType) {
+        const descriptions = {
+            'executive': 'Resumo executivo com descobertas-chave e recomendações estratégicas',
+            'technical': 'Análise técnica completa com todos os componentes detalhados',
+            'implementation': 'Roadmap detalhado de implementação com cronograma e recursos',
+            'dashboard': 'Dashboard visual interativo com métricas em tempo real',
+            'insights': 'Insights prioritizados com análise de impacto e acionabilidade',
+            'roi': 'Projeções financeiras detalhadas e análise de retorno sobre investimento',
+            'contingency': 'Cenários de risco e planos de resposta detalhados',
+            'monitoring': 'KPIs, alertas e sistema de acompanhamento contínuo'
+        };
+        return descriptions[reportType] || 'Relatório especializado';
+    }
+
+    getReportExtension(reportType) {
+        if (reportType === 'dashboard') return 'html';
+        if (reportType === 'technical') return 'json';
+        return 'md';
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    renderFinancialScenario(scenarioName, scenarioData) {
+        if (!scenarioData) return '';
+
+        return `
+            <div class="scenario-card scenario-${scenarioName.toLowerCase()}">
+                <h6>${scenarioName}</h6>
+                <div class="scenario-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Receita Mensal</span>
+                        <span class="metric-value">${scenarioData.receita_mensal || 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Clientes/Mês</span>
+                        <span class="metric-value">${scenarioData.clientes_mes || 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Ticket Médio</span>
+                        <span class="metric-value">${scenarioData.ticket_medio || 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Margem</span>
+                        <span class="metric-value">${scenarioData.margem_lucro || 'N/A'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    createInnovativeContainer() {
+        const resultsContent = document.querySelector('.results-content');
+        if (resultsContent) {
+            const container = document.createElement('div');
+            container.id = 'innovativeResults';
+            container.className = 'result-container';
+            resultsContent.appendChild(container);
+            return container;
+        }
+        return null;
+    }
+
+    createReportsContainer() {
+        const resultsContent = document.querySelector('.results-content');
+        if (resultsContent) {
+            const container = document.createElement('div');
+            container.id = 'reportsResults';
+            container.className = 'result-container';
+            resultsContent.appendChild(container);
+            return container;
+        }
+        return null;
+    }
+
+    formatInnovativeComponentContent(componentData) {
+        if (!componentData || typeof componentData !== 'object') {
+            return '<p>Dados do componente não disponíveis</p>';
+        }
+
+        let html = '<div class="innovative-content">';
+        
+        for (const [key, value] of Object.entries(componentData)) {
+            html += `
+                <div class="innovative-item">
+                    <h6>${this.formatLabel(key)}</h6>
+                    ${Array.isArray(value) ? 
+                        `<ul>${value.map(item => `<li>${item}</li>`).join('')}</ul>` :
+                        `<p>${value}</p>`
+                    }
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        return html;
+    }
+
+    addInsightInteractivity() {
+        // Adiciona filtros por categoria
+        const insightsContainer = document.querySelector('.insights-showcase.enhanced');
+        if (insightsContainer) {
+            const filterControls = document.createElement('div');
+            filterControls.className = 'insight-filters';
+            filterControls.innerHTML = `
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">Todos</button>
+                    <button class="filter-btn" data-filter="Oportunidade">Oportunidades</button>
+                    <button class="filter-btn" data-filter="Risco">Riscos</button>
+                    <button class="filter-btn" data-filter="Tendência">Tendências</button>
+                    <button class="filter-btn" data-filter="Estratégia">Estratégias</button>
+                </div>
+            `;
+            
+            insightsContainer.parentNode.insertBefore(filterControls, insightsContainer);
+            
+            // Adiciona event listeners para filtros
+            filterControls.addEventListener('click', (e) => {
+                if (e.target.classList.contains('filter-btn')) {
+                    this.filterInsights(e.target.dataset.filter);
+                    
+                    // Atualiza botões ativos
+                    filterControls.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                }
+            });
+        }
+    }
+
+    filterInsights(category) {
+        const insightCards = document.querySelectorAll('.insight-card.enhanced');
+        
+        insightCards.forEach(card => {
+            if (category === 'all') {
+                card.style.display = 'block';
+            } else {
+                const cardCategory = card.querySelector('.insight-category')?.textContent;
+                card.style.display = cardCategory === category ? 'block' : 'none';
+            }
+        });
+    }
+
+    async checkSystemCapabilities() {
+        try {
+            // Verifica capacidades do sistema aprimorado
+            const response = await fetch('/api/app_status');
+            const status = await response.json();
+
+            this.updateSystemCapabilities(status);
+
+        } catch (error) {
+            console.error('❌ Erro ao verificar capacidades:', error);
+        }
+    }
+
+    updateSystemCapabilities(status) {
+        const capabilitiesContainer = document.getElementById('systemCapabilities');
+        if (capabilitiesContainer) {
+            const geminiAvailable = status.services?.ai_providers?.details?.gemini?.available || false;
+            const groqAvailable = status.services?.ai_providers?.details?.groq?.available || false;
+
+            capabilitiesContainer.innerHTML = `
+                <div class="capabilities-grid">
+                    <div class="capability-item ${geminiAvailable ? 'available' : 'unavailable'}">
+                        <i class="fas fa-brain"></i>
+                        <span>Gemini 2.5 Pro</span>
+                        <span class="status">${geminiAvailable ? 'Disponível' : 'Indisponível'}</span>
+                    </div>
+                    <div class="capability-item ${groqAvailable ? 'available' : 'unavailable'}">
+                        <i class="fas fa-rocket"></i>
+                        <span>Groq Fallback</span>
+                        <span class="status">${groqAvailable ? 'Disponível' : 'Indisponível'}</span>
+                    </div>
+                    <div class="capability-item available">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Relatórios Consolidados</span>
+                        <span class="status">Ativo</span>
+                    </div>
+                    <div class="capability-item available">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Backup Local</span>
+                        <span class="status">Garantido</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    hideProgress() {
         const progressArea = document.getElementById('progressArea');
         if (progressArea) {
             progressArea.style.display = 'none';
         }
 
-        // Reabilita botão de análise
         const analyzeBtn = document.getElementById('analyzeBtn');
         if (analyzeBtn) {
             analyzeBtn.disabled = false;
             analyzeBtn.classList.remove('loading');
-            analyzeBtn.innerHTML = '<i class="fas fa-magic"></i> <span>Gerar Análise Ultra-Detalhada</span>';
+            analyzeBtn.innerHTML = '<i class="fas fa-magic"></i> <span>Gerar Análise Ultra-Avançada</span>';
         }
 
         if (this.progressInterval) {
@@ -202,1211 +962,40 @@ class AnalysisManager {
         }
     }
 
-    startProgressTracking() {
-        let progress = 0;
-        let step = 0;
-        const steps = [
-            "🔍 Coletando dados do formulário",
-            "📊 Processando anexos inteligentes", 
-            "🌐 Realizando pesquisa profunda massiva",
-            "🧠 Analisando com múltiplas IAs",
-            "👤 Criando avatar arqueológico completo",
-            "🧠 Gerando drivers mentais customizados",
-            "🎭 Desenvolvendo provas visuais instantâneas",
-            "🛡️ Construindo sistema anti-objeção",
-            "🎯 Arquitetando pré-pitch invisível",
-            "⚔️ Mapeando concorrência profunda",
-            "📈 Calculando métricas e projeções",
-            "🔮 Predizendo futuro do mercado",
-            "✨ Consolidando insights exclusivos"
-        ];
-
-        this.progressInterval = setInterval(() => {
-            if (progress < 95) {
-                progress += Math.random() * 3;
-                step = Math.min(Math.floor(progress / 8), steps.length - 1);
-                
-                this.updateProgress(progress, step, steps[step]);
-            }
-        }, 2000);
-    }
-
-    updateProgress(percentage, stepIndex, stepMessage) {
-        const progressFill = document.querySelector('.progress-fill');
-        const currentStep = document.getElementById('currentStep');
-        const stepCounter = document.getElementById('stepCounter');
-        const estimatedTime = document.getElementById('estimatedTime');
-
-        if (progressFill) {
-            progressFill.style.width = Math.min(percentage, 100) + '%';
-        }
-
-        if (currentStep) {
-            currentStep.textContent = stepMessage;
-        }
-
-        if (stepCounter) {
-            stepCounter.textContent = `${stepIndex + 1}/13`;
-        }
-
-        if (estimatedTime) {
-            const remaining = Math.max(0, Math.floor((100 - percentage) / 2));
-            const minutes = Math.floor(remaining / 60);
-            const seconds = remaining % 60;
-            estimatedTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-    }
-
-    displayResults(analysis) {
-        const resultsArea = document.getElementById('resultsArea');
-        if (!resultsArea) return;
-
-        resultsArea.style.display = 'block';
-        resultsArea.scrollIntoView({ behavior: 'smooth' });
-
-        // Limpa resultados anteriores
-        this.clearPreviousResults();
-
-        // Exibe cada seção
-        this.displayAvatar(analysis.avatar_ultra_detalhado);
-        this.displayDrivers(analysis.drivers_mentais_customizados);
-        this.displayVisualProofs(analysis.provas_visuais_instantaneas);
-        this.displayAntiObjection(analysis.sistema_anti_objecao);
-        this.displayPrePitch(analysis.pre_pitch_invisivel);
-        this.displayPositioning(analysis.escopo);
-        this.displayCompetition(analysis.analise_concorrencia_detalhada);
-        this.displayKeywords(analysis.estrategia_palavras_chave);
-        this.displayMetrics(analysis.metricas_performance_detalhadas);
-        this.displayFunnel(analysis.funil_vendas_detalhado);
-        this.displayActionPlan(analysis.plano_acao_detalhado);
-        this.displayInsights(analysis.insights_exclusivos);
-        this.displayFuturePredictions(analysis.predicoes_futuro_completas);
-        this.displayResearch(analysis.pesquisa_web_massiva);
-        this.displayMetadata(analysis.metadata);
-
-        // Habilita botões de ação
-        this.enableResultActions();
-    }
-
-    clearPreviousResults() {
-        const containers = [
-            'avatarResults', 'driversResults', 'visualProofsResults', 'antiObjectionResults',
-            'prePitchResults', 'positioningResults', 'competitionResults', 'keywordsResults',
-            'metricsResults', 'funnelResults', 'actionPlanResults', 'insightsResults',
-            'futureResults', 'researchResults', 'metadataResults'
-        ];
-
-        containers.forEach(containerId => {
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.innerHTML = '';
-            }
-        });
-    }
-
-    displayAvatar(avatarData) {
-        if (!avatarData) return;
-
-        const container = document.getElementById('avatarResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-user-circle"></i>
-                    <h4>Avatar Ultra-Detalhado</h4>
-                </div>
-                <div class="result-section-content">
-                    <div class="avatar-grid">
-        `;
-
-        // Perfil Demográfico
-        if (avatarData.perfil_demografico) {
-            html += `
-                <div class="avatar-card">
-                    <h5><i class="fas fa-chart-pie"></i> Perfil Demográfico</h5>
-            `;
-            
-            for (const [key, value] of Object.entries(avatarData.perfil_demografico)) {
-                html += `
-                    <div class="avatar-item">
-                        <span class="avatar-label">${key.replace(/_/g, ' ')}</span>
-                        <span class="avatar-value">${value}</span>
-                    </div>
-                `;
-            }
-            html += `</div>`;
-        }
-
-        // Perfil Psicográfico
-        if (avatarData.perfil_psicografico) {
-            html += `
-                <div class="avatar-card">
-                    <h5><i class="fas fa-brain"></i> Perfil Psicográfico</h5>
-            `;
-            
-            for (const [key, value] of Object.entries(avatarData.perfil_psicografico)) {
-                html += `
-                    <div class="avatar-item">
-                        <span class="avatar-label">${key.replace(/_/g, ' ')}</span>
-                        <span class="avatar-value">${value}</span>
-                    </div>
-                `;
-            }
-            html += `</div>`;
-        }
-
-        html += `</div>`;
-
-        // Dores Viscerais
-        if (avatarData.dores_viscerais && Array.isArray(avatarData.dores_viscerais)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            Dores Viscerais (${avatarData.dores_viscerais.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <ul class="insight-list">
-            `;
-            
-            avatarData.dores_viscerais.forEach(dor => {
-                html += `
-                    <li class="insight-item">
-                        <i class="fas fa-arrow-right"></i>
-                        <span class="insight-text">${dor}</span>
-                    </li>
-                `;
-            });
-            
-            html += `</ul></div></div>`;
-        }
-
-        // Desejos Secretos
-        if (avatarData.desejos_secretos && Array.isArray(avatarData.desejos_secretos)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-heart"></i>
-                            Desejos Secretos (${avatarData.desejos_secretos.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <ul class="insight-list">
-            `;
-            
-            avatarData.desejos_secretos.forEach(desejo => {
-                html += `
-                    <li class="insight-item">
-                        <i class="fas fa-star"></i>
-                        <span class="insight-text">${desejo}</span>
-                    </li>
-                `;
-            });
-            
-            html += `</ul></div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayDrivers(driversData) {
-        if (!driversData) return;
-
-        const container = document.getElementById('driversResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-brain"></i>
-                    <h4>Drivers Mentais Customizados</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Drivers Customizados
-        if (driversData.drivers_customizados && Array.isArray(driversData.drivers_customizados)) {
-            html += `<div class="drivers-grid">`;
-            
-            driversData.drivers_customizados.forEach((driver, index) => {
-                html += `
-                    <div class="driver-card">
-                        <h4>Driver ${index + 1}: ${driver.nome || 'Driver Mental'}</h4>
-                        <div class="driver-content">
-                            <p><strong>Gatilho Central:</strong> ${driver.gatilho_central || 'N/A'}</p>
-                            <p><strong>Definição:</strong> ${driver.definicao_visceral || 'N/A'}</p>
-                `;
-                
-                if (driver.roteiro_ativacao) {
-                    html += `
-                        <div class="driver-script">
-                            <h6>Roteiro de Ativação</h6>
-                            <p><strong>Pergunta:</strong> ${driver.roteiro_ativacao.pergunta_abertura || 'N/A'}</p>
-                            <p><strong>História:</strong> ${driver.roteiro_ativacao.historia_analogia || 'N/A'}</p>
-                            <p><strong>Comando:</strong> ${driver.roteiro_ativacao.comando_acao || 'N/A'}</p>
-                        </div>
-                    `;
-                }
-                
-                if (driver.frases_ancoragem && Array.isArray(driver.frases_ancoragem)) {
-                    html += `
-                        <div class="anchor-phrases">
-                            <h6>Frases de Ancoragem</h6>
-                            <ul>
-                    `;
-                    driver.frases_ancoragem.forEach(frase => {
-                        html += `<li>"${frase}"</li>`;
-                    });
-                    html += `</ul></div>`;
-                }
-                
-                html += `</div></div>`;
-            });
-            
-            html += `</div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayVisualProofs(proofsData) {
-        if (!proofsData || !Array.isArray(proofsData)) return;
-
-        const container = document.getElementById('visualProofsResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-eye"></i>
-                    <h4>Provas Visuais Instantâneas</h4>
-                </div>
-                <div class="result-section-content">
-                    <div class="insights-showcase">
-        `;
-
-        proofsData.forEach((prova, index) => {
-            html += `
-                <div class="insight-card">
-                    <div class="insight-number">${index + 1}</div>
-                    <div class="insight-content">
-                        <h5>${prova.nome || 'Prova Visual'}</h5>
-                        <p><strong>Conceito:</strong> ${prova.conceito_alvo || 'N/A'}</p>
-                        <p><strong>Experimento:</strong> ${prova.experimento || 'N/A'}</p>
-            `;
-            
-            if (prova.materiais && Array.isArray(prova.materiais)) {
-                html += `
-                    <p><strong>Materiais:</strong></p>
-                    <ul>
-                `;
-                prova.materiais.forEach(material => {
-                    html += `<li>${material}</li>`;
-                });
-                html += `</ul>`;
-            }
-            
-            html += `</div></div>`;
-        });
-
-        html += `</div></div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayAntiObjection(antiObjectionData) {
-        if (!antiObjectionData) return;
-
-        const container = document.getElementById('antiObjectionResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-shield-alt"></i>
-                    <h4>Sistema Anti-Objeção</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Objeções Universais
-        if (antiObjectionData.objecoes_universais) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-universal-access"></i>
-                            Objeções Universais
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-            `;
-            
-            for (const [tipo, objecao] of Object.entries(antiObjectionData.objecoes_universais)) {
-                html += `
-                    <div class="info-card">
-                        <strong>${tipo.toUpperCase()}</strong>
-                        <span>Objeção: ${objecao.objecao || 'N/A'}</span>
-                        <span>Contra-ataque: ${objecao.contra_ataque || 'N/A'}</span>
-                `;
-                
-                if (objecao.scripts_customizados && Array.isArray(objecao.scripts_customizados)) {
-                    html += `<ul>`;
-                    objecao.scripts_customizados.forEach(script => {
-                        html += `<li>${script}</li>`;
-                    });
-                    html += `</ul>`;
-                }
-                
-                html += `</div>`;
-            }
-            
-            html += `</div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayPrePitch(prePitchData) {
-        if (!prePitchData) return;
-
-        const container = document.getElementById('prePitchResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-bullseye"></i>
-                    <h4>Pré-Pitch Invisível</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Roteiro Completo
-        if (prePitchData.roteiro_completo) {
-            html += `
-                <div class="expandable-section expanded">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-script"></i>
-                            Roteiro Completo
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-            `;
-            
-            for (const [secao, dados] of Object.entries(prePitchData.roteiro_completo)) {
-                html += `
-                    <div class="info-card">
-                        <strong>${secao.replace(/_/g, ' ').toUpperCase()}</strong>
-                `;
-                
-                if (typeof dados === 'object') {
-                    for (const [key, value] of Object.entries(dados)) {
-                        html += `<span><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</span>`;
-                    }
-                } else {
-                    html += `<span>${dados}</span>`;
-                }
-                
-                html += `</div>`;
-            }
-            
-            html += `</div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayPositioning(positioningData) {
-        if (!positioningData) return;
-
-        const container = document.getElementById('positioningResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-crosshairs"></i>
-                    <h4>Escopo e Posicionamento</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        if (positioningData.posicionamento_mercado) {
-            html += `
-                <div class="info-card">
-                    <strong>Posicionamento no Mercado</strong>
-                    <span>${positioningData.posicionamento_mercado}</span>
-                </div>
-            `;
-        }
-
-        if (positioningData.proposta_valor) {
-            html += `
-                <div class="info-card">
-                    <strong>Proposta de Valor</strong>
-                    <span>${positioningData.proposta_valor}</span>
-                </div>
-            `;
-        }
-
-        if (positioningData.diferenciais_competitivos && Array.isArray(positioningData.diferenciais_competitivos)) {
-            html += `
-                <div class="info-card">
-                    <strong>Diferenciais Competitivos</strong>
-                    <ul>
-            `;
-            positioningData.diferenciais_competitivos.forEach(diferencial => {
-                html += `<li>${diferencial}</li>`;
-            });
-            html += `</ul></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayCompetition(competitionData) {
-        if (!competitionData || !Array.isArray(competitionData)) return;
-
-        const container = document.getElementById('competitionResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-chess"></i>
-                    <h4>Análise de Concorrência</h4>
-                </div>
-                <div class="result-section-content">
-                    <table class="competition-table">
-                        <thead>
-                            <tr>
-                                <th>Concorrente</th>
-                                <th>Forças</th>
-                                <th>Fraquezas</th>
-                                <th>Estratégia</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        competitionData.forEach(competitor => {
-            const forcas = competitor.analise_swot?.forcas || [];
-            const fraquezas = competitor.analise_swot?.fraquezas || [];
-            
-            html += `
-                <tr>
-                    <td class="competitor-name">${competitor.nome || 'Concorrente'}</td>
-                    <td class="competitor-strengths">${forcas.slice(0, 3).join(', ')}</td>
-                    <td class="competitor-weaknesses">${fraquezas.slice(0, 3).join(', ')}</td>
-                    <td>${competitor.estrategia_marketing || 'N/A'}</td>
-                </tr>
-            `;
-        });
-
-        html += `</tbody></table></div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayKeywords(keywordsData) {
-        if (!keywordsData) return;
-
-        const container = document.getElementById('keywordsResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-key"></i>
-                    <h4>Estratégia de Palavras-Chave</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Palavras primárias
-        if (keywordsData.palavras_primarias && Array.isArray(keywordsData.palavras_primarias)) {
-            html += `
-                <div class="info-card">
-                    <strong>Palavras-Chave Primárias</strong>
-                    <div class="keyword-tags">
-            `;
-            keywordsData.palavras_primarias.forEach(keyword => {
-                html += `<span class="keyword-tag">${keyword}</span>`;
-            });
-            html += `</div></div>`;
-        }
-
-        // Palavras secundárias
-        if (keywordsData.palavras_secundarias && Array.isArray(keywordsData.palavras_secundarias)) {
-            html += `
-                <div class="info-card">
-                    <strong>Palavras-Chave Secundárias</strong>
-                    <div class="keyword-tags">
-            `;
-            keywordsData.palavras_secundarias.slice(0, 20).forEach(keyword => {
-                html += `<span class="keyword-tag secondary">${keyword}</span>`;
-            });
-            html += `</div></div>`;
-        }
-
-        // Long tail
-        if (keywordsData.long_tail && Array.isArray(keywordsData.long_tail)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-list"></i>
-                            Palavras-Chave Long Tail (${keywordsData.long_tail.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <div class="keyword-tags">
-            `;
-            keywordsData.long_tail.forEach(keyword => {
-                html += `<span class="keyword-tag long-tail">${keyword}</span>`;
-            });
-            html += `</div></div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayMetrics(metricsData) {
-        if (!metricsData) return;
-
-        const container = document.getElementById('metricsResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-chart-line"></i>
-                    <h4>Métricas de Performance</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // KPIs principais
-        if (metricsData.kpis_principais && Array.isArray(metricsData.kpis_principais)) {
-            html += `<div class="metrics-grid">`;
-            
-            metricsData.kpis_principais.forEach(kpi => {
-                html += `
-                    <div class="metric-card">
-                        <div class="metric-icon">
-                            <i class="fas fa-bullseye"></i>
-                        </div>
-                        <div class="metric-title">${kpi.metrica || 'Métrica'}</div>
-                        <div class="metric-value">${kpi.objetivo || 'N/A'}</div>
-                        <div class="metric-description">${kpi.frequencia || 'N/A'}</div>
-                    </div>
-                `;
-            });
-            
-            html += `</div>`;
-        }
-
-        // Projeções financeiras
-        if (metricsData.projecoes_financeiras) {
-            html += `
-                <table class="projections-table">
-                    <thead>
-                        <tr>
-                            <th>Cenário</th>
-                            <th>Receita Mensal</th>
-                            <th>Clientes/Mês</th>
-                            <th>Ticket Médio</th>
-                            <th>Margem</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            const cenarios = ['cenario_conservador', 'cenario_realista', 'cenario_otimista'];
-            const labels = ['Conservador', 'Realista', 'Otimista'];
-            const classes = ['scenario-conservative', 'scenario-realistic', 'scenario-optimistic'];
-            
-            cenarios.forEach((cenario, index) => {
-                const dados = metricsData.projecoes_financeiras[cenario];
-                if (dados) {
-                    html += `
-                        <tr class="${classes[index]}">
-                            <td class="scenario-label">${labels[index]}</td>
-                            <td>${dados.receita_mensal || 'N/A'}</td>
-                            <td>${dados.clientes_mes || 'N/A'}</td>
-                            <td>${dados.ticket_medio || 'N/A'}</td>
-                            <td>${dados.margem_lucro || 'N/A'}</td>
-                        </tr>
-                    `;
-                }
-            });
-            
-            html += `</tbody></table>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayFunnel(funnelData) {
-        if (!funnelData) return;
-
-        const container = document.getElementById('funnelResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-filter"></i>
-                    <h4>Funil de Vendas Detalhado</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        const fases = ['topo_funil', 'meio_funil', 'fundo_funil'];
-        const labels = ['Topo do Funil', 'Meio do Funil', 'Fundo do Funil'];
-        const icons = ['fas fa-users', 'fas fa-user-friends', 'fas fa-user-check'];
-
-        fases.forEach((fase, index) => {
-            const dados = funnelData[fase];
-            if (dados) {
-                html += `
-                    <div class="info-card">
-                        <strong><i class="${icons[index]}"></i> ${labels[index]}</strong>
-                        <span><strong>Objetivo:</strong> ${dados.objetivo || 'N/A'}</span>
-                `;
-                
-                if (dados.estrategias && Array.isArray(dados.estrategias)) {
-                    html += `<span><strong>Estratégias:</strong></span><ul>`;
-                    dados.estrategias.forEach(estrategia => {
-                        html += `<li>${estrategia}</li>`;
-                    });
-                    html += `</ul>`;
-                }
-                
-                html += `</div>`;
-            }
-        });
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayActionPlan(actionPlanData) {
-        if (!actionPlanData) return;
-
-        const container = document.getElementById('actionPlanResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-tasks"></i>
-                    <h4>Plano de Ação Detalhado</h4>
-                </div>
-                <div class="result-section-content">
-                    <div class="action-timeline">
-        `;
-
-        const fases = Object.keys(actionPlanData);
+    highlightFieldError(field, message) {
+        field.classList.add('error');
         
-        fases.forEach((fase, index) => {
-            const dados = actionPlanData[fase];
-            if (dados && typeof dados === 'object') {
-                html += `
-                    <div class="timeline-item">
-                        <div class="timeline-marker"></div>
-                        <div class="timeline-content">
-                            <div class="timeline-title">
-                                ${fase.replace(/_/g, ' ').toUpperCase()}
-                                <span class="timeline-duration">${dados.duracao || 'N/A'}</span>
-                            </div>
-                `;
-                
-                if (dados.atividades && Array.isArray(dados.atividades)) {
-                    html += `<div class="timeline-activities">`;
-                    dados.atividades.forEach(atividade => {
-                        html += `
-                            <div class="timeline-activity">
-                                <i class="fas fa-check"></i>
-                                <span>${atividade}</span>
-                            </div>
-                        `;
-                    });
-                    html += `</div>`;
-                }
-                
-                if (dados.investimento) {
-                    html += `<p><strong>Investimento:</strong> ${dados.investimento}</p>`;
-                }
-                
-                html += `</div></div>`;
-            }
-        });
+        // Remove erro anterior
+        const existingError = field.parentNode.querySelector('.field-error');
+        if (existingError) {
+            existingError.remove();
+        }
 
-        html += `</div></div></div>`;
-        container.innerHTML = html;
+        // Adiciona novo erro
+        const errorElement = document.createElement('div');
+        errorElement.className = 'field-error';
+        errorElement.textContent = message;
+        field.parentNode.appendChild(errorElement);
     }
 
-    displayInsights(insightsData) {
-        if (!insightsData || !Array.isArray(insightsData)) return;
-
-        const container = document.getElementById('insightsResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-lightbulb"></i>
-                    <h4>Insights Exclusivos (${insightsData.length})</h4>
-                </div>
-                <div class="result-section-content">
-                    <div class="insights-showcase">
-        `;
-
-        insightsData.forEach((insight, index) => {
-            html += `
-                <div class="insight-card">
-                    <div class="insight-number">${index + 1}</div>
-                    <div class="insight-content">${insight}</div>
-                </div>
-            `;
-        });
-
-        html += `</div></div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayFuturePredictions(futureData) {
-        if (!futureData) return;
-
-        const container = document.getElementById('futureResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-crystal-ball"></i>
-                    <h4>Predições do Futuro</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Tendências atuais
-        if (futureData.tendencias_atuais) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-trending-up"></i>
-                            Tendências Atuais
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-            `;
-            
-            const tendencias = futureData.tendencias_atuais.tendencias_relevantes || {};
-            for (const [nome, dados] of Object.entries(tendencias)) {
-                html += `
-                    <div class="info-card">
-                        <strong>${nome.replace(/_/g, ' ').toUpperCase()}</strong>
-                        <span><strong>Fase:</strong> ${dados.fase_atual || 'N/A'}</span>
-                        <span><strong>Impacto:</strong> ${dados.impacto_esperado || 'N/A'}</span>
-                        <span><strong>Timeline:</strong> ${dados.timeline || 'N/A'}</span>
-                    </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-        }
-
-        // Oportunidades emergentes
-        if (futureData.oportunidades_emergentes && Array.isArray(futureData.oportunidades_emergentes)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-rocket"></i>
-                            Oportunidades Emergentes (${futureData.oportunidades_emergentes.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-            `;
-            
-            futureData.oportunidades_emergentes.forEach(oportunidade => {
-                html += `
-                    <div class="info-card">
-                        <strong>${oportunidade.nome || 'Oportunidade'}</strong>
-                        <span>${oportunidade.descricao || 'N/A'}</span>
-                        <span><strong>Potencial:</strong> ${oportunidade.potencial_mercado || 'N/A'}</span>
-                        <span><strong>Timeline:</strong> ${oportunidade.timeline || 'N/A'}</span>
-                        <span><strong>ROI:</strong> ${oportunidade.roi_esperado || 'N/A'}</span>
-                    </div>
-                `;
-            });
-            
-            html += `</div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayResearch(researchData) {
-        if (!researchData) return;
-
-        const container = document.getElementById('researchResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-search"></i>
-                    <h4>Pesquisa Web Massiva</h4>
-                </div>
-                <div class="result-section-content">
-                    <div class="research-content">
-        `;
-
-        // Estatísticas da pesquisa
-        if (researchData.estatisticas) {
-            html += `
-                <div class="research-stats">
-                    <h5>Estatísticas da Pesquisa</h5>
-                    <div class="stats-grid">
-            `;
-            
-            for (const [key, value] of Object.entries(researchData.estatisticas)) {
-                html += `
-                    <div class="stat-item">
-                        <span class="stat-label">${key.replace(/_/g, ' ')}</span>
-                        <span class="stat-value">${value}</span>
-                    </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-        }
-
-        // Queries executadas
-        if (researchData.queries_executadas && Array.isArray(researchData.queries_executadas)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-search"></i>
-                            Queries Executadas (${researchData.queries_executadas.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <ul class="insight-list">
-            `;
-            
-            researchData.queries_executadas.forEach(query => {
-                html += `
-                    <li class="insight-item">
-                        <i class="fas fa-search"></i>
-                        <span class="insight-text">${query}</span>
-                    </li>
-                `;
-            });
-            
-            html += `</ul></div></div>`;
-        }
-
-        // Fontes consultadas
-        if (researchData.fontes && Array.isArray(researchData.fontes)) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-link"></i>
-                            Fontes Consultadas (${researchData.fontes.length})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <div class="results-list">
-            `;
-            
-            researchData.fontes.slice(0, 20).forEach(fonte => {
-                html += `
-                    <div class="result-item">
-                        <h5>${fonte.title || 'Sem título'}</h5>
-                        <div class="result-url">${fonte.url || 'N/A'}</div>
-                    </div>
-                `;
-            });
-            
-            html += `</div></div></div>`;
-        }
-
-        html += `</div></div></div>`;
-        container.innerHTML = html;
-    }
-
-    displayMetadata(metadataData) {
-        if (!metadataData) return;
-
-        const container = document.getElementById('metadataResults');
-        if (!container) return;
-
-        let html = `
-            <div class="result-section">
-                <div class="result-section-header">
-                    <i class="fas fa-info-circle"></i>
-                    <h4>Informações da Análise</h4>
-                </div>
-                <div class="result-section-content">
-        `;
-
-        // Indicador de qualidade dos dados
-        html += `
-            <div class="data-quality-indicator">
-                <span class="quality-label">Qualidade dos Dados:</span>
-                <span class="quality-value real-data">100% DADOS REAIS</span>
-            </div>
-        `;
-
-        // Metadata grid
-        html += `<div class="metadata-grid">`;
-        
-        const metadataItems = [
-            { label: 'Tempo de Processamento', value: metadataData.processing_time_formatted || 'N/A' },
-            { label: 'Engine de Análise', value: metadataData.analysis_engine || 'N/A' },
-            { label: 'Gerado em', value: metadataData.generated_at ? new Date(metadataData.generated_at).toLocaleString('pt-BR') : 'N/A' },
-            { label: 'Score de Qualidade', value: metadataData.quality_score ? `${metadataData.quality_score}%` : 'N/A' },
-            { label: 'Fontes de Dados', value: metadataData.real_data_sources || 'N/A' },
-            { label: 'Conteúdo Analisado', value: metadataData.total_content_analyzed ? `${metadataData.total_content_analyzed.toLocaleString()} chars` : 'N/A' }
-        ];
-        
-        metadataItems.forEach(item => {
-            html += `
-                <div class="metadata-item">
-                    <span class="metadata-label">${item.label}</span>
-                    <span class="metadata-value">${item.value}</span>
-                </div>
-            `;
-        });
-        
-        html += `</div>`;
-
-        // Informações de arquivos locais
-        if (metadataData.local_files) {
-            html += `
-                <div class="expandable-section">
-                    <div class="expandable-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <div class="expandable-title">
-                            <i class="fas fa-folder"></i>
-                            Arquivos Locais Salvos (${metadataData.local_files.files_created || 0})
-                        </div>
-                        <i class="fas fa-chevron-down expandable-icon"></i>
-                    </div>
-                    <div class="expandable-content">
-                        <p>Análise salva em arquivos TXT separados:</p>
-                        <ul class="insight-list">
-            `;
-            
-            if (metadataData.local_files.files && Array.isArray(metadataData.local_files.files)) {
-                metadataData.local_files.files.forEach(file => {
-                    html += `
-                        <li class="insight-item">
-                            <i class="fas fa-file-alt"></i>
-                            <span class="insight-text">${file.name} (${file.type}) - ${(file.size / 1024).toFixed(1)} KB</span>
-                        </li>
-                    `;
-                });
-            }
-            
-            html += `</ul></div></div>`;
-        }
-
-        html += `</div></div>`;
-        container.innerHTML = html;
-    }
-
-    enableResultActions() {
-        const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-        const saveJsonBtn = document.getElementById('saveJsonBtn');
-
-        if (downloadPdfBtn) {
-            downloadPdfBtn.style.display = 'inline-flex';
-            downloadPdfBtn.onclick = () => this.downloadPDF();
-        }
-
-        if (saveJsonBtn) {
-            saveJsonBtn.style.display = 'inline-flex';
+    clearFieldError(field) {
+        field.classList.remove('error');
+        const errorElement = field.parentNode.querySelector('.field-error');
+        if (errorElement) {
+            errorElement.remove();
         }
     }
 
-    async downloadPDF() {
-        if (!this.currentAnalysis) {
-            this.showError('Nenhuma análise disponível para download');
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/generate_pdf', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(this.currentAnalysis)
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `analise_mercado_${new Date().toISOString().slice(0, 10)}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                this.showSuccess('PDF baixado com sucesso!');
-            } else {
-                this.showError('Erro ao gerar PDF');
-            }
-
-        } catch (error) {
-            this.showError('Erro ao baixar PDF: ' + error.message);
-        }
-    }
-
-    saveAnalysisLocally(analysis) {
-        if (!analysis) {
-            this.showError('Nenhuma análise disponível para salvar');
-            return;
-        }
-
-        const dataStr = JSON.stringify(analysis, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `analise_${analysis.metadata?.generated_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        this.showSuccess('Análise salva localmente!');
-    }
-
-    // Métodos de teste
-    async testExtraction() {
-        try {
-            const response = await fetch('/api/test_extraction', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: 'https://g1.globo.com/tecnologia/' })
-            });
-            
-            const result = await response.json();
-            console.log('Teste de Extração:', result);
-            
-            if (result.success) {
-                this.showSuccess(`Extração OK: ${result.content_length} caracteres`);
-            } else {
-                this.showError(`Extração falhou: ${result.error}`);
-            }
-        } catch (error) {
-            this.showError('Erro no teste: ' + error.message);
-        }
-    }
-
-    async testSearch() {
-        try {
-            const response = await fetch('/api/test_search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: 'mercado digital Brasil 2024' })
-            });
-            
-            const result = await response.json();
-            console.log('Teste de Busca:', result);
-            
-            if (result.success) {
-                this.showSuccess(`Busca OK: ${result.results_count} resultados`);
-            } else {
-                this.showError(`Busca falhou: ${result.error}`);
-            }
-        } catch (error) {
-            this.showError('Erro no teste: ' + error.message);
-        }
-    }
-
-    async showExtractorStats() {
-        try {
-            const response = await fetch('/api/extractor_stats');
-            const result = await response.json();
-            console.log('Estatísticas dos Extratores:', result);
-            
-            if (result.success) {
-                const stats = result.stats;
-                let message = 'Estatísticas dos Extratores:\n';
-                
-                for (const [name, data] of Object.entries(stats)) {
-                    if (name !== 'global') {
-                        message += `${name}: ${data.available ? 'Ativo' : 'Inativo'}\n`;
-                    }
-                }
-                
-                alert(message);
-            }
-        } catch (error) {
-            this.showError('Erro ao obter stats: ' + error.message);
-        }
-    }
-
-    async resetExtractors() {
-        try {
-            const response = await fetch('/api/reset_extractors', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                this.showSuccess('Extratores resetados com sucesso!');
-            } else {
-                this.showError('Erro ao resetar extratores');
-            }
-        } catch (error) {
-            this.showError('Erro no reset: ' + error.message);
-        }
+    showSuccess(message) {
+        this.showAlert(message, 'success');
     }
 
     showError(message) {
         this.showAlert(message, 'error');
     }
 
-    showSuccess(message) {
-        this.showAlert(message, 'success');
+    showInfo(message) {
+        this.showAlert(message, 'info');
     }
 
     showAlert(message, type = 'info') {
@@ -1414,13 +1003,20 @@ class AnalysisManager {
         const existingAlerts = document.querySelectorAll('.alert');
         existingAlerts.forEach(alert => alert.remove());
 
+        // Cria novo alerta
         const alert = document.createElement('div');
         alert.className = `alert alert-${type}`;
-        alert.textContent = message;
+        alert.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>${message}</span>
+                <button onclick="this.parentElement.parentElement.remove()" 
+                        style="background: none; border: none; color: inherit; cursor: pointer; font-size: 18px;">&times;</button>
+            </div>
+        `;
 
         document.body.appendChild(alert);
 
-        // Remove após 5 segundos
+        // Remove automaticamente após 5 segundos
         setTimeout(() => {
             if (alert.parentNode) {
                 alert.remove();
@@ -1429,12 +1025,8 @@ class AnalysisManager {
     }
 }
 
-// Inicializa quando DOM estiver pronto
+// Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     window.analysisManager = new AnalysisManager();
-    
-    // Adiciona ao objeto global app se existir
-    if (window.app) {
-        window.app.analysisManager = window.analysisManager;
-    }
+    console.log('🚀 Analysis Manager Ultra-Avançado inicializado');
 });
